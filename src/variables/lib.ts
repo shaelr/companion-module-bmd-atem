@@ -12,6 +12,7 @@ import {
 	getSuperSourceBox,
 	getUSK,
 	type StateWrapper,
+	type FairlightLevelsStore,
 } from '../state.js'
 import { assertUnreachable, CLASSIC_AUDIO_MIN_GAIN, type InstanceBaseExt } from '../util.js'
 import type { CompanionVariableDefinitions } from '@companion-module/base'
@@ -446,6 +447,34 @@ function updateFairlightAudioMonitorVariables(state: AtemState, values: Partial<
 	values[`audio_monitor_master_gain`] = formatAudioProperty(monitor?.inputMasterGain)
 	values[`audio_monitor_talkback_gain`] = formatAudioProperty(monitor?.inputTalkbackGain)
 	values[`audio_monitor_sidetone_gain`] = formatAudioProperty(monitor?.inputSidetoneGain)
+}
+
+export function updateFairlightAudioSourceLevelVariables(
+	inputIndex: number,
+	store: FairlightLevelsStore,
+	values: Partial<VariablesSchema>,
+): void {
+	const levels = store.sources.get(inputIndex)?.get('-65280')
+	values[`audio_input_${inputIndex}_level_left`] =
+		levels !== undefined ? formatAudioProperty(levels.outputLeftLevel) : undefined
+	values[`audio_input_${inputIndex}_level_right`] =
+		levels !== undefined ? formatAudioProperty(levels.outputRightLevel) : undefined
+	values[`audio_input_${inputIndex}_level_max`] =
+		levels !== undefined ? formatAudioProperty(Math.max(levels.outputLeftLevel, levels.outputRightLevel)) : undefined
+}
+
+export function updateFairlightAudioMasterLevelVariables(
+	store: FairlightLevelsStore,
+	values: Partial<VariablesSchema>,
+): void {
+	values['audio_master_level_left'] =
+		store.master !== undefined ? formatAudioProperty(store.master.leftLevel) : undefined
+	values['audio_master_level_right'] =
+		store.master !== undefined ? formatAudioProperty(store.master.rightLevel) : undefined
+	values['audio_master_level_max'] =
+		store.master !== undefined
+			? formatAudioProperty(Math.max(store.master.leftLevel, store.master.rightLevel))
+			: undefined
 }
 
 function updateSuperSourceVariables(
@@ -923,6 +952,15 @@ export function InitVariables(instance: InstanceBaseExt, model: ModelSpec, state
 				variables[`audio_input_${inputId}_mixOption`] = {
 					name: `Mix option for input ${inputId}`,
 				}
+				variables[`audio_input_${inputId}_level_left`] = {
+					name: `Output level (dBFS) for input ${inputId} - left`,
+				}
+				variables[`audio_input_${inputId}_level_right`] = {
+					name: `Output level (dBFS) for input ${inputId} - right`,
+				}
+				variables[`audio_input_${inputId}_level_max`] = {
+					name: `Output level (dBFS) for input ${inputId} - max L+R`,
+				}
 			}
 
 			if (input?.sources !== undefined && input.sources[-256]) {
@@ -967,6 +1005,15 @@ export function InitVariables(instance: InstanceBaseExt, model: ModelSpec, state
 		//master
 		variables[`audio_master_faderGain`] = {
 			name: `Fader gain for master`,
+		}
+		variables[`audio_master_level_left`] = {
+			name: `Output level (dBFS) for master - left`,
+		}
+		variables[`audio_master_level_right`] = {
+			name: `Output level (dBFS) for master - right`,
+		}
+		variables[`audio_master_level_max`] = {
+			name: `Output level (dBFS) for master - max L+R`,
 		}
 		updateFairlightAudioMasterVariables(state.state, values)
 

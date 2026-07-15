@@ -14,6 +14,32 @@ import { MediaPoolPreviewCache } from './mediaPoolPreviews.js'
 
 export type TallyBySource = Commands.TallyBySourceCommand['properties']
 
+export interface FairlightAudioLevels {
+	inputLeftLevel: number
+	inputRightLevel: number
+	inputLeftPeak: number
+	inputRightPeak: number
+	expanderGainReduction: number
+	compressorGainReduction: number
+	limiterGainReduction: number
+	outputLeftLevel: number
+	outputRightLevel: number
+	outputLeftPeak: number
+	outputRightPeak: number
+	leftLevel: number
+	rightLevel: number
+	leftPeak: number
+	rightPeak: number
+}
+
+export type FairlightMasterLevels = Omit<FairlightAudioLevels, 'expanderGainReduction'>
+
+export interface FairlightLevelsStore {
+	/** Keyed by input index, then by source bigint as string */
+	sources: Map<number, Map<string, FairlightAudioLevels>>
+	master: FairlightMasterLevels | undefined
+}
+
 export interface StateWrapper {
 	state: AtemState
 	tally: TallyBySource
@@ -22,6 +48,8 @@ export interface StateWrapper {
 	readonly atemCameraState: AtemCameraControlStateBuilder
 
 	readonly mediaPoolCache: MediaPoolPreviewCache
+
+	fairlightAudioLevels: FairlightLevelsStore
 }
 
 export type TallyCache = Map<

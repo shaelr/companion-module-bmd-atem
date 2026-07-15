@@ -12,6 +12,8 @@ import {
 	type UpdateVariablesProps,
 	updateChangedVariables,
 	updateDeviceIpVariable,
+	updateFairlightAudioSourceLevelVariables,
+	updateFairlightAudioMasterLevelVariables,
 } from './variables/lib.js'
 import { AtemCommandBatching } from './batching.js'
 import { AtemTransitions } from './transitions.js'
@@ -47,6 +49,7 @@ export default class AtemInstance extends InstanceBase<AtemSchema> {
 	private isActive: boolean
 	private durationInterval: NodeJS.Timeout | undefined
 	private atemTransitions: AtemTransitions
+	private audioLevelFeedbackTimer: NodeJS.Timeout | undefined
 
 	public config: AtemConfig = {}
 	public timecodeSeconds = 0
@@ -65,6 +68,7 @@ export default class AtemInstance extends InstanceBase<AtemSchema> {
 			tally: {},
 			tallyCache: new Map(),
 			atemCameraState: new AtemCameraControlStateBuilder(0), // TODO - when should this be emptied?
+			fairlightAudioLevels: { sources: new Map(), master: undefined },
 
 			mediaPoolCache: new MediaPoolPreviewCache(
 				emptyState,
@@ -134,6 +138,8 @@ export default class AtemInstance extends InstanceBase<AtemSchema> {
 		// Force clear the cached state
 		this.wrappedState.state = AtemStateUtil.Create()
 		this.wrappedState.atemCameraState.reset(0)
+		this.wrappedState.fairlightAudioLevels.sources.clear()
+		this.wrappedState.fairlightAudioLevels.master = undefined
 
 		this.model = GetModelSpec(this.getBestModelId() || MODEL_AUTO_DETECT) || GetAutoDetectModel()
 		this.log('debug', 'ATEM changed model: ' + this.model.id)
@@ -177,6 +183,11 @@ export default class AtemInstance extends InstanceBase<AtemSchema> {
 		this.isActive = false
 
 		this.atemTransitions.stopAll()
+
+		if (this.audioLevelFeedbackTimer) {
+			clearTimeout(this.audioLevelFeedbackTimer)
+			this.audioLevelFeedbackTimer = undefined
+		}
 
 		if (this.atem) {
 			this.atem.disconnect().catch(() => null)
@@ -237,6 +248,19 @@ export default class AtemInstance extends InstanceBase<AtemSchema> {
 				this.displayClockSeconds =
 					command.properties.time.hours * 3600 + command.properties.time.minutes * 60 + command.properties.time.seconds
 				updateTimecodeVariables(this, this.wrappedState.state, values)
+			} else if (command instanceof Commands.FairlightMixerSourceLevelsUpdateCommand) {
+				let inputMap = this.wrappedState.fairlightAudioLevels.sources.get(command.index)
+				if (!inputMap) {
+					inputMap = new Map()
+					this.wrappedState.fairlightAudioLevels.sources.set(command.index, inputMap)
+				}
+				inputMap.set(String(command.source), command.properties)
+				updateFairlightAudioSourceLevelVariables(command.index, this.wrappedState.fairlightAudioLevels, values)
+				this.scheduleAudioLevelFeedbackCheck()
+			} else if (command instanceof Commands.FairlightMixerMasterLevelsUpdateCommand) {
+				this.wrappedState.fairlightAudioLevels.master = command.properties
+				updateFairlightAudioMasterLevelVariables(this.wrappedState.fairlightAudioLevels, values)
+				this.scheduleAudioLevelFeedbackCheck()
 			}
 		}
 
@@ -589,6 +613,14 @@ export default class AtemInstance extends InstanceBase<AtemSchema> {
 		return changedFeedbackIds
 	}
 
+	private scheduleAudioLevelFeedbackCheck(): void {
+		if (this.audioLevelFeedbackTimer) return
+		this.audioLevelFeedbackTimer = setTimeout(() => {
+			this.audioLevelFeedbackTimer = undefined
+			this.checkFeedbacks('fairlightAudioSourceLevel', 'fairlightAudioMasterLevel')
+		}, 25)
+	}
+
 	private setupAtemConnection(): void {
 		this.atem = new Atem()
 
@@ -641,6 +673,12 @@ export default class AtemInstance extends InstanceBase<AtemSchema> {
 				}
 
 				this.updateCompanionBits()
+
+				if (this.model.fairlightAudio) {
+					this.atem.startFairlightMixerSendLevels().catch((e) => {
+						this.log('debug', 'Failed to start audio level monitoring: ' + e)
+					})
+				}
 
 				if (
 					!this.durationInterval &&

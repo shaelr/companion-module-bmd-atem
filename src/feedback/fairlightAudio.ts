@@ -20,6 +20,24 @@ import {
 } from '../options/fairlight-routing.js'
 
 export type AtemFairlightAudioFeedbacks = {
+	['fairlightAudioSourceLevel']: {
+		type: 'boolean'
+		options: {
+			input: number
+			source: string
+			channel: 'left' | 'right' | 'max'
+			comparitor: NumberComparitor
+			level: number
+		}
+	}
+	['fairlightAudioMasterLevel']: {
+		type: 'boolean'
+		options: {
+			channel: 'left' | 'right' | 'max'
+			comparitor: NumberComparitor
+			level: number
+		}
+	}
 	['fairlightAudioInputGain']: {
 		type: 'boolean'
 		options: {
@@ -119,6 +137,8 @@ export function createFairlightAudioFeedbacks(
 ): CompanionFeedbackDefinitions<AtemFairlightAudioFeedbacks> {
 	if (!model.fairlightAudio) {
 		return {
+			['fairlightAudioSourceLevel']: undefined,
+			['fairlightAudioMasterLevel']: undefined,
 			['fairlightAudioInputGain']: undefined,
 			['fairlightAudioFaderGain']: undefined,
 			['fairlightAudioMixOption']: undefined,
@@ -138,7 +158,91 @@ export function createFairlightAudioFeedbacks(
 	const audioInputOption = AtemAudioInputPicker(model, state.state)
 	const audioSourceOption = AtemFairlightAudioSourcePicker()
 
+	const channelOption = {
+		type: 'dropdown' as const,
+		id: 'channel' as const,
+		label: 'Channel',
+		default: 'max' as const,
+		choices: [
+			{ id: 'max', label: 'Either (max of L+R)' },
+			{ id: 'left', label: 'Left' },
+			{ id: 'right', label: 'Right' },
+		],
+	}
+
+	const levelOption = {
+		type: 'number' as const,
+		label: 'Level (dBFS)',
+		id: 'level' as const,
+		range: true,
+		default: -12,
+		step: 0.1,
+		min: -60,
+		max: 0,
+		description: 'Audio output level in dBFS (-60 = silence)',
+		asInteger: false,
+		clampValues: true,
+	}
+
 	return {
+		['fairlightAudioSourceLevel']: audioInputOption
+			? {
+					type: 'boolean',
+					name: 'Fairlight Audio: Source output level',
+					description: 'Compares the current real-time output level of a source against a threshold',
+					options: convertOptionsFields({
+						input: audioInputOption,
+						source: audioSourceOption,
+						channel: channelOption,
+						comparitor: NumberComparitorPicker(),
+						level: levelOption,
+					}),
+					defaultStyle: {
+						color: 0x000000,
+						bgcolor: 0xff0000,
+					},
+					callback: ({ options }): boolean => {
+						const levels = state.fairlightAudioLevels.sources.get(options.input)?.get(options.source)
+						if (!levels) return false
+						let current: number
+						if (options.channel === 'left') {
+							current = levels.outputLeftLevel / 100
+						} else if (options.channel === 'right') {
+							current = levels.outputRightLevel / 100
+						} else {
+							current = Math.max(levels.outputLeftLevel, levels.outputRightLevel) / 100
+						}
+						return compareNumber(options.level, options.comparitor, current)
+					},
+				}
+			: undefined,
+		['fairlightAudioMasterLevel']: {
+			type: 'boolean',
+			name: 'Fairlight Audio: Master output level',
+			description: 'Compares the current real-time master output level against a threshold',
+			options: convertOptionsFields({
+				channel: channelOption,
+				comparitor: NumberComparitorPicker(),
+				level: levelOption,
+			}),
+			defaultStyle: {
+				color: 0x000000,
+				bgcolor: 0xff0000,
+			},
+			callback: ({ options }): boolean => {
+				const levels = state.fairlightAudioLevels.master
+				if (!levels) return false
+				let current: number
+				if (options.channel === 'left') {
+					current = levels.leftLevel / 100
+				} else if (options.channel === 'right') {
+					current = levels.rightLevel / 100
+				} else {
+					current = Math.max(levels.leftLevel, levels.rightLevel) / 100
+				}
+				return compareNumber(options.level, options.comparitor, current)
+			},
+		},
 		['fairlightAudioInputGain']: audioInputOption
 			? {
 					type: 'boolean',
