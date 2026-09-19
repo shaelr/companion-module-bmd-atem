@@ -44,15 +44,39 @@ Key entry point: `src/main.ts` — the `AtemInstance` class extends `InstanceBas
 
 ### Fairlight audio level monitoring
 
-Real-time audio levels are **not** stored in `AtemState` — they arrive via streaming commands at ~50 Hz. The flow:
+Real-time audio levels are **not** stored in `AtemState` — they arrive via streaming commands at ~50 Hz. There are **two independent systems** in `StateWrapper` that both consume this stream, from a fork merge (see "Syncing with upstream" below) where our custom implementation and upstream's own implementation landed side by side rather than replacing each other:
 
-1. On connect, `this.atem.startFairlightMixerSendLevels()` sends the SFLN command to enable streaming.
+**Ours — `StateWrapper.fairlightAudioLevels`** (`FairlightLevelsStore`, added in this fork):
+
+1. On connect, `this.atem.startFairlightMixerSendLevels()` unconditionally sends the SFLN command whenever `model.fairlightAudio` is set — levels stream regardless of whether anything uses them.
 2. `FairlightMixerSourceLevelsUpdateCommand` and `FairlightMixerMasterLevelsUpdateCommand` are handled in the `receivedCommands` loop in `main.ts`.
-3. Levels are stored in `StateWrapper.fairlightAudioLevels` — a `FairlightLevelsStore` with a `sources` Map (keyed by input index → source bigint-as-string, e.g. `"-65280"` for stereo) and a `master` entry.
+3. Levels are stored in a `sources` Map (keyed by input index → source bigint-as-string, e.g. `"-65280"` for stereo) and a `master` entry.
 4. Feedback checks are throttled to 40 Hz via `scheduleAudioLevelFeedbackCheck()` to prevent button flicker.
-5. Variable values (`audio_input_X_level_left/right/max`, `audio_master_level_left/right/max`) update at full rate.
+5. Powers the `fairlightAudioSourceLevelThreshold` / `fairlightAudioMasterLevelThreshold` boolean feedbacks (`src/feedback/fairlightAudio.ts`) — compare a level against a threshold to drive button color — and the `audio_input_X_level_left/right/max` / `audio_master_level_left/right/max` variables, which update at full rate. Upstream has no equivalent of these variables.
+
+**Upstream — `StateWrapper.audioLevels`** (`AtemAudioLevels` class in `src/audioLevels.ts`):
+
+1. Subscribe/unsubscribe based — SFLN is only requested while at least one feedback using it is active (`state.audioLevels.subscribe(id)` / `unsubscribe(id)`), and levels are cleared on disconnect.
+2. Fed via the `levelChanged` event (`this.atem.on('levelChanged', ...)`), not the raw commands.
+3. Powers the `fairlightAudioMasterLevel` / `fairlightAudioInputLevel` `value`-type feedbacks (`src/feedback/audioLevels.ts`) — these just display the raw dB number on a button, no threshold comparison.
+4. Checked at 20 Hz internally.
+
+Because ours starts SFLN unconditionally, upstream's lazy subscribe/unsubscribe optimization is currently moot in practice — the stream is already running. The feedback names are deliberately non-colliding (`...Threshold` suffix on ours) since a straight rename would have broken existing Companion button configs built against the original names.
 
 Level values from the ATEM are signed 16-bit integers; divide by 100 to get dBFS.
+
+### Syncing with upstream
+
+This fork carries a small number of commits on top of `bitfocus/companion-module-bmd-atem` (currently: the Fairlight level monitoring above, plus this file). An `upstream` remote is configured locally for pulling in upstream changes:
+
+```bash
+git fetch upstream
+git merge upstream/main
+```
+
+Expect conflicts where upstream has since built its own version of something this fork added — resolve by keeping both where they're genuinely different features (as with the two audio-level systems above), not by silently dropping one side. After resolving, run `yarn build`, `yarn test`, and `yarn lint` before pushing — a clean merge can still produce colliding identifiers (feedback IDs, variable keys) that only a build/test pass will catch.
+
+Pushing to `origin` requires the `gh` CLI token to have GitHub's `workflow` scope if the merge touches anything under `.github/workflows/` — otherwise the push is rejected with "refusing to allow an OAuth App to create or update workflow". Fix with `gh auth refresh -h github.com -s workflow` (opens a browser).
 
 ### Adding a new feature area
 
