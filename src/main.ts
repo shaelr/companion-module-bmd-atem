@@ -6,6 +6,7 @@ import { GetAutoDetectModel, GetModelSpec, GetParsedModelSpec, type ModelSpec } 
 import { GetPresetsList } from './presets/index.js'
 import { type StateWrapper } from './state.js'
 import { MediaPoolPreviewCache } from './mediaPoolPreviews.js'
+import { AtemAudioLevels } from './audioLevels.js'
 import { MODEL_AUTO_DETECT } from './models/types.js'
 import {
 	InitVariables,
@@ -69,6 +70,23 @@ export default class AtemInstance extends InstanceBase<AtemSchema> {
 			tallyCache: new Map(),
 			atemCameraState: new AtemCameraControlStateBuilder(0), // TODO - when should this be emptied?
 			fairlightAudioLevels: { sources: new Map(), master: undefined },
+
+			audioLevels: new AtemAudioLevels(
+				() => this.checkFeedbacks('fairlightAudioMasterLevel', 'fairlightAudioInputLevel'),
+				(enabled) => {
+					if (!this.atem) return
+
+					if (enabled) {
+						this.atem.startFairlightMixerSendLevels().catch((e) => {
+							this.log('debug', `Failed to start audio levels: ${e}`)
+						})
+					} else {
+						this.atem.stopFairlightMixerSendLevels().catch((e) => {
+							this.log('debug', `Failed to stop audio levels: ${e}`)
+						})
+					}
+				},
+			),
 
 			mediaPoolCache: new MediaPoolPreviewCache(
 				emptyState,
@@ -183,6 +201,7 @@ export default class AtemInstance extends InstanceBase<AtemSchema> {
 		this.isActive = false
 
 		this.atemTransitions.stopAll()
+		this.wrappedState.audioLevels.destroy()
 
 		if (this.audioLevelFeedbackTimer) {
 			clearTimeout(this.audioLevelFeedbackTimer)
@@ -380,7 +399,12 @@ export default class AtemInstance extends InstanceBase<AtemSchema> {
 			}
 
 			if (path.match(/^inputs/)) {
-				// reset everything, since names of inputs might have changed
+				// Reset everything, since names of inputs might have changed.
+				// NOTE: atem-connection only emits this at `inputs.<id>` granularity, so we cannot tell a
+				// name change from a connector (externalPortType) change here. The `inputPortType` feedback
+				// therefore relies on this full reInit -> checkAllFeedbacks() to be re-evaluated; if this is
+				// ever made more granular, add a targeted `changedFeedbacks.add('inputPortType')` for the
+				// externalPortType path so that feedback keeps reacting to connector changes.
 				reInit = true
 				break
 			}
@@ -617,7 +641,7 @@ export default class AtemInstance extends InstanceBase<AtemSchema> {
 		if (this.audioLevelFeedbackTimer) return
 		this.audioLevelFeedbackTimer = setTimeout(() => {
 			this.audioLevelFeedbackTimer = undefined
-			this.checkFeedbacks('fairlightAudioSourceLevel', 'fairlightAudioMasterLevel')
+			this.checkFeedbacks('fairlightAudioSourceLevelThreshold', 'fairlightAudioMasterLevelThreshold')
 		}, 25)
 	}
 
@@ -629,6 +653,8 @@ export default class AtemInstance extends InstanceBase<AtemSchema> {
 				this.wrappedState.state = this.atem.state
 				this.wrappedState.mediaPoolCache.checkUpdatedState(this.atem.state)
 				this.invalidateCachedTallyState()
+				// The switcher does not remember that we asked for levels
+				this.wrappedState.audioLevels.resume()
 
 				const atemInfo = this.wrappedState.state.info
 				this.log('info', 'Connected to a ' + atemInfo.productIdentifier)
@@ -718,6 +744,7 @@ export default class AtemInstance extends InstanceBase<AtemSchema> {
 				this.updateStatus(InstanceStatus.Connecting)
 			}
 			this.log('info', 'Lost connection')
+			this.wrappedState.audioLevels.clearCache()
 
 			if (this.durationInterval) {
 				clearInterval(this.durationInterval)
@@ -725,6 +752,7 @@ export default class AtemInstance extends InstanceBase<AtemSchema> {
 			}
 			// TODO - clear cached state after some timeout
 		})
+		this.atem.on('levelChanged', (levels) => this.wrappedState.audioLevels.handleLevels(levels))
 		this.atem.on('stateChanged', this.processStateChange.bind(this))
 		this.atem.on('receivedCommands', this.processReceivedCommands.bind(this))
 

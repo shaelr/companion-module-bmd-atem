@@ -11,6 +11,7 @@ import type { SuperSource, TransitionProperties } from 'atem-connection/dist/sta
 import type { JsonValue } from '@companion-module/base'
 import type { AtemCameraControlStateBuilder } from '@atem-connection/camera-control'
 import { MediaPoolPreviewCache } from './mediaPoolPreviews.js'
+import type { AtemAudioLevels } from './audioLevels.js'
 
 export type TallyBySource = Commands.TallyBySourceCommand['properties']
 
@@ -50,6 +51,7 @@ export interface StateWrapper {
 	readonly mediaPoolCache: MediaPoolPreviewCache
 
 	fairlightAudioLevels: FairlightLevelsStore
+	readonly audioLevels: AtemAudioLevels
 }
 
 export type TallyCache = Map<

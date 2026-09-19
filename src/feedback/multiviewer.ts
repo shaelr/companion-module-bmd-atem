@@ -13,6 +13,7 @@ import {
 	AtemMultiviewerPicker,
 	resolveMultiviewerIndex,
 } from '../options/multiviewer.js'
+import { parseSourceId } from '../options/sources.js'
 
 export type AtemMultiviewerFeedbacks = {
 	['mv_source']: {
@@ -20,7 +21,7 @@ export type AtemMultiviewerFeedbacks = {
 		options: {
 			multiViewerId: number
 			windowIndex: number
-			source: number
+			source: JsonValue
 		}
 	}
 	['multiviewerLayout']: {
@@ -33,6 +34,20 @@ export type AtemMultiviewerFeedbacks = {
 			bottomRight: MultiviewerQuadrantState | JsonValue | undefined
 		}
 	}
+	['multiviewerWindowLabel']: {
+		type: 'boolean'
+		options: {
+			multiViewerId: number
+			windowIndex: number
+		}
+	}
+	['multiviewerWindowBorder']: {
+		type: 'boolean'
+		options: {
+			multiViewerId: number
+			windowIndex: number
+		}
+	}
 }
 
 export function createMultiviewerFeedbacks(
@@ -43,45 +58,55 @@ export function createMultiviewerFeedbacks(
 		return {
 			['mv_source']: undefined,
 			['multiviewerLayout']: undefined,
+			['multiviewerWindowLabel']: undefined,
+			['multiviewerWindowBorder']: undefined,
 		}
 	}
-	return {
-		['mv_source']: {
-			type: 'boolean',
-			name: 'Multiviewer: Window source',
-			options: convertOptionsFields({
-				multiViewerId: AtemMultiviewerPicker(model),
-				windowIndex: AtemMultiviewWindowPicker(model),
-				source: AtemMultiviewSourcePicker(model, state.state),
-			}),
-			defaultStyle: {
-				color: 0x000000,
-				bgcolor: 0xffff00,
-			},
-			callback: ({ options }): boolean => {
-				const window = getMultiviewerWindow(
-					state.state,
-					resolveMultiviewerIndex(model, options.multiViewerId),
-					options.windowIndex - 1,
-				)
-				return window?.source === options.source
-			},
-			learn: ({ options }) => {
-				const window = getMultiviewerWindow(
-					state.state,
-					resolveMultiviewerIndex(model, options.multiViewerId),
-					options.windowIndex - 1,
-				)
+	// Some models have a multiviewer whose windows cannot be re-sourced, leaving no choices
+	const sourcePicker = AtemMultiviewSourcePicker(model, state.state)
 
-				if (window) {
-					return {
-						source: window.source,
+	return {
+		['mv_source']:
+			sourcePicker.choices.length > 0
+				? {
+						type: 'boolean',
+						name: 'Multiviewer: Window source',
+						options: convertOptionsFields({
+							multiViewerId: AtemMultiviewerPicker(model),
+							windowIndex: AtemMultiviewWindowPicker(model),
+							source: sourcePicker,
+						}),
+						defaultStyle: {
+							color: 0x000000,
+							bgcolor: 0xffff00,
+						},
+						callback: ({ options }): boolean => {
+							const source = parseSourceId(options.source)
+							if (source === null) return false
+							const window = getMultiviewerWindow(
+								state.state,
+								resolveMultiviewerIndex(model, options.multiViewerId),
+								options.windowIndex - 1,
+							)
+							return window?.source === source
+						},
+						learn: ({ options }) => {
+							const window = getMultiviewerWindow(
+								state.state,
+								resolveMultiviewerIndex(model, options.multiViewerId),
+								options.windowIndex - 1,
+							)
+
+							if (window) {
+								return {
+									source: window.source,
+								}
+							} else {
+								return undefined
+							}
+						},
 					}
-				} else {
-					return undefined
-				}
-			},
-		},
+				: undefined,
 		['multiviewerLayout']: {
 			type: 'boolean',
 			name: 'Multiviewer: Layout',
@@ -167,5 +192,49 @@ export function createMultiviewerFeedbacks(
 				}
 			},
 		},
+		['multiviewerWindowLabel']: model.multiviewerOverlay
+			? {
+					type: 'boolean',
+					name: 'Multiviewer: Window label',
+					options: convertOptionsFields({
+						multiViewerId: AtemMultiviewerPicker(model),
+						windowIndex: AtemMultiviewWindowPicker(model),
+					}),
+					defaultStyle: {
+						color: 0x000000,
+						bgcolor: 0xffff00,
+					},
+					callback: ({ options }): boolean => {
+						const window = getMultiviewerWindow(
+							state.state,
+							resolveMultiviewerIndex(model, options.multiViewerId),
+							options.windowIndex - 1,
+						)
+						return !!window?.overlayProperties?.labelVisible
+					},
+				}
+			: undefined,
+		['multiviewerWindowBorder']: model.multiviewerOverlay
+			? {
+					type: 'boolean',
+					name: 'Multiviewer: Window border',
+					options: convertOptionsFields({
+						multiViewerId: AtemMultiviewerPicker(model),
+						windowIndex: AtemMultiviewWindowPicker(model),
+					}),
+					defaultStyle: {
+						color: 0x000000,
+						bgcolor: 0xffff00,
+					},
+					callback: ({ options }): boolean => {
+						const window = getMultiviewerWindow(
+							state.state,
+							resolveMultiviewerIndex(model, options.multiViewerId),
+							options.windowIndex - 1,
+						)
+						return !!window?.overlayProperties?.borderVisible
+					},
+				}
+			: undefined,
 	}
 }

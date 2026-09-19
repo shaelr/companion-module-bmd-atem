@@ -13,7 +13,14 @@ export interface ModelSpec {
 	MVs: number
 	DVEs: number
 	multiviewerFullGrid: boolean
+	/** Whether the multiviewer supports overlay properties (window label/border visibility and border colour) */
+	multiviewerOverlay: boolean
 	SSrc: number
+	/**
+	 * Whether the SuperSource uses the per-box border of the Constellation HD range and newer
+	 * (firmware 9.6.0+), instead of the older global per-supersource border.
+	 */
+	superSourceBoxBorder?: boolean
 	macros: number
 	displayClock: number
 	media: { players: number; stills: number; clips: number; captureStills: boolean }
@@ -40,6 +47,8 @@ export interface VideoInputInfo {
 	portType: Enums.InternalPortType
 	sourceAvailability: Enums.SourceAvailability
 	meAvailability: Enums.MeAvailability
+	/** The physical connectors this input can be switched between, when it has more than one */
+	externalPorts?: Enums.ExternalPortType[]
 }
 
 export interface AudioFairlightInputInfo {

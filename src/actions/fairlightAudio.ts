@@ -9,6 +9,7 @@ import {
 	CHOICES_FAIRLIGHT_AUDIO_MIX_OPTION,
 	fairlightMixOptionFromProtocol,
 	fairlightMixOptionToProtocol,
+	fairlightAudioSourceLabel,
 	type FairlightMixOption2,
 } from '../options/audio.js'
 import type { AtemTransitions, FadeDurationFieldsType } from '../transitions.js'
@@ -21,6 +22,10 @@ import {
 	parseAudioRoutingStringSingle,
 } from '../options/fairlight-routing.js'
 import { FadeDurationFields } from '../options/fade.js'
+import { clamp } from '../util.js'
+
+const FAIRLIGHT_MASTER_MIN_GAIN = -10000
+const FAIRLIGHT_MASTER_MAX_GAIN = 1000
 
 export type AtemFairlightAudioActions = {
 	['fairlightAudioInputGain']: {
@@ -185,6 +190,28 @@ export type AtemFairlightAudioActions = {
 	}
 }
 
+/**
+ * Whether an input is stereo or split into mono channels is configured on the switcher, and decides
+ * which source ids it has. Sending to a source an input does not have is silently ignored by the
+ * switcher, so check for it and report it instead.
+ */
+function assertFairlightSourceExists(state: StateWrapper, inputId: number, sourceId: string): void {
+	const sources = state.state.fairlight?.inputs?.[inputId]?.sources
+	// Nothing known about this input, so no reason to believe the source is wrong
+	if (!sources) return
+
+	if (sources[sourceId]) return
+
+	const available = Object.keys(sources)
+	if (available.length === 0) return
+
+	throw new Error(
+		`Audio input ${inputId} has no ${fairlightAudioSourceLabel(sourceId)} source, only: ${available
+			.map(fairlightAudioSourceLabel)
+			.join(', ')}`,
+	)
+}
+
 export function createFairlightAudioActions(
 	atem: Atem | undefined,
 	model: ModelSpec,
@@ -254,6 +281,7 @@ export function createFairlightAudioActions(
 					callback: async ({ options }) => {
 						const inputId = options.input
 						const sourceId = options.source
+						assertFairlightSourceExists(state, inputId, sourceId)
 
 						const audioChannels = state.state.fairlight?.inputs ?? {}
 						const audioSources = audioChannels[inputId]?.sources ?? {}
@@ -298,6 +326,7 @@ export function createFairlightAudioActions(
 					callback: async ({ options }) => {
 						const inputId = options.input
 						const sourceId = options.source
+						assertFairlightSourceExists(state, inputId, sourceId)
 
 						const audioChannels = state.state.fairlight?.inputs ?? {}
 						const audioSources = audioChannels[inputId]?.sources ?? {}
@@ -341,6 +370,7 @@ export function createFairlightAudioActions(
 					callback: async ({ options }) => {
 						const inputId = options.input
 						const sourceId = options.source
+						assertFairlightSourceExists(state, inputId, sourceId)
 
 						await atem?.setFairlightAudioMixerSourceProps(inputId, sourceId, {
 							framesDelay: options.delay,
@@ -383,6 +413,7 @@ export function createFairlightAudioActions(
 					callback: async ({ options }) => {
 						const inputId = options.input
 						const sourceId = options.source
+						assertFairlightSourceExists(state, inputId, sourceId)
 
 						const delta = options.delay
 
@@ -424,6 +455,7 @@ export function createFairlightAudioActions(
 					callback: async ({ options }) => {
 						const inputId = options.input
 						const sourceId = options.source
+						assertFairlightSourceExists(state, inputId, sourceId)
 
 						const audioChannels = state.state.fairlight?.inputs ?? {}
 						const audioSources = audioChannels[inputId]?.sources ?? {}
@@ -468,6 +500,7 @@ export function createFairlightAudioActions(
 					callback: async ({ options }) => {
 						const inputId = options.input
 						const sourceId = options.source
+						assertFairlightSourceExists(state, inputId, sourceId)
 
 						const audioChannels = state.state.fairlight?.inputs ?? {}
 						const audioSources = audioChannels[inputId]?.sources ?? {}
@@ -512,6 +545,7 @@ export function createFairlightAudioActions(
 					callback: async ({ options }) => {
 						const inputId = options.input
 						const sourceId = options.source
+						assertFairlightSourceExists(state, inputId, sourceId)
 
 						const audioChannels = state.state.fairlight?.inputs ?? {}
 						const audioSources = audioChannels[inputId]?.sources ?? {}
@@ -556,6 +590,7 @@ export function createFairlightAudioActions(
 					callback: async ({ options }) => {
 						const inputId = options.input
 						const sourceId = options.source
+						assertFairlightSourceExists(state, inputId, sourceId)
 
 						const audioChannels = state.state.fairlight?.inputs ?? {}
 						const audioSources = audioChannels[inputId]?.sources ?? {}
@@ -600,6 +635,7 @@ export function createFairlightAudioActions(
 					callback: async ({ options }) => {
 						const inputId = options.input
 						const sourceId = options.source
+						assertFairlightSourceExists(state, inputId, sourceId)
 
 						let newVal: Enums.FairlightAudioMixOption
 						switch (options.option) {
@@ -678,6 +714,7 @@ export function createFairlightAudioActions(
 					callback: async ({ options }) => {
 						const inputId = options.input
 						const sourceId = options.source
+						assertFairlightSourceExists(state, inputId, sourceId)
 						await atem?.setFairlightAudioMixerSourceResetPeaks(inputId, sourceId, {
 							output: true,
 							dynamicsInput: false,
@@ -697,7 +734,7 @@ export function createFairlightAudioActions(
 					default: 0,
 					step: 0.1,
 					min: -100,
-					max: 6,
+					max: FAIRLIGHT_MASTER_MAX_GAIN / 100,
 					description: '-100 = -inf',
 					showMinAsNegativeInfinity: true,
 					asInteger: false,
@@ -748,7 +785,7 @@ export function createFairlightAudioActions(
 							})
 						},
 						currentGain,
-						currentGain + options.delta * 100,
+						clamp(FAIRLIGHT_MASTER_MIN_GAIN, FAIRLIGHT_MASTER_MAX_GAIN, currentGain + options.delta * 100),
 						options,
 					)
 				}
@@ -774,6 +811,7 @@ export function createFairlightAudioActions(
 						callback: async ({ options }) => {
 							const inputId = options.input
 							const sourceId = options.source
+							assertFairlightSourceExists(state, inputId, sourceId)
 
 							let target: boolean
 							if (options.solo === 'toggle') {

@@ -11,6 +11,7 @@ export const ModelSpecTVS: ModelSpec = {
 	DSKs: 2,
 	MVs: 1,
 	multiviewerFullGrid: false,
+	multiviewerOverlay: false,
 	DVEs: 0,
 	SSrc: 0,
 	macros: 100,
@@ -30,6 +31,7 @@ export const ModelSpecTVS: ModelSpec = {
 	})
 		.addInternalColorsAndBlack()
 		.addExternalInputs(6)
+		.withExternalPorts([3, 4], [Enums.ExternalPortType.SDI, Enums.ExternalPortType.HDMI])
 		.addMediaPlayers(2)
 		.addCleanFeeds(2)
 		.addProgramPreview()

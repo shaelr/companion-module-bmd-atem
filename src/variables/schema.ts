@@ -74,6 +74,11 @@ export type VariablesSchema = {
 	[key: `dsk_${number}_input`]: string
 	[key: `dsk_${number}_input_id`]: number
 	[key: `dsk_${number}_onAir`]: boolean
+	[key: `dsk_${number}_maskEnabled`]: boolean
+	[key: `dsk_${number}_maskTop`]: number
+	[key: `dsk_${number}_maskBottom`]: number
+	[key: `dsk_${number}_maskLeft`]: number
+	[key: `dsk_${number}_maskRight`]: number
 
 	[key: `long_${number}`]: string
 	[key: `short_${number}`]: string
@@ -122,6 +127,7 @@ export type VariablesSchema = {
 	[key: `ssrc${number}_box${number}_cropLeft`]: number
 	[key: `ssrc${number}_box${number}_cropRight`]: number
 
+	[key: `audio_input_${string}_name`]: string | undefined
 	[key: `audio_input_${string}_balance`]: string | undefined
 	[key: `audio_input_${string}_faderGain`]: string | undefined
 	[key: `audio_input_${string}_framesDelay`]: string | undefined

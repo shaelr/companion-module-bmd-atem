@@ -53,21 +53,28 @@ export function AtemAudioInputPicker(
 	}
 }
 
+const FAIRLIGHT_AUDIO_SOURCES: DropdownChoice[] = [
+	{
+		id: '-65280',
+		label: 'Stereo',
+	},
+	{
+		id: '-256',
+		label: 'Mono (Ch1)',
+	},
+	{
+		id: '-255',
+		label: 'Mono (Ch2)',
+	},
+]
+
+/** Describe a fairlight source id, falling back to the raw id when it is not one we know */
+export function fairlightAudioSourceLabel(sourceId: string | number): string {
+	return FAIRLIGHT_AUDIO_SOURCES.find((s) => s.id == sourceId)?.label ?? `${sourceId}`
+}
+
 export function AtemFairlightAudioSourcePicker(): CompanionInputFieldDropdown<'source'> {
-	const sources: DropdownChoice[] = [
-		{
-			id: '-65280',
-			label: 'Stereo',
-		},
-		{
-			id: '-256',
-			label: 'Mono (Ch1)',
-		},
-		{
-			id: '-255',
-			label: 'Mono (Ch2)',
-		},
-	]
+	const sources = FAIRLIGHT_AUDIO_SOURCES
 
 	return {
 		type: 'dropdown',
@@ -167,7 +174,7 @@ export const CHOICES_CLASSIC_AUDIO_MIX_OPTION: DropdownChoice<Enums.AudioMixOpti
 
 export type AudioInputSubset = 'delay' | 'routing'
 
-function GetAudioInputsList(model: ModelSpec, state: AtemState, subset?: AudioInputSubset): MiniSourceInfo[] {
+export function GetAudioInputsList(model: ModelSpec, state: AtemState, subset?: AudioInputSubset): MiniSourceInfo[] {
 	const getSource = (id: number, videoId: number | undefined, defLong: string): MiniSourceInfo => {
 		const input = videoId !== undefined ? state.inputs[videoId] : undefined
 		const longName = input?.longName || defLong

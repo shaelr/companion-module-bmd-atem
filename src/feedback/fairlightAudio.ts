@@ -20,7 +20,7 @@ import {
 } from '../options/fairlight-routing.js'
 
 export type AtemFairlightAudioFeedbacks = {
-	['fairlightAudioSourceLevel']: {
+	['fairlightAudioSourceLevelThreshold']: {
 		type: 'boolean'
 		options: {
 			input: number
@@ -30,7 +30,7 @@ export type AtemFairlightAudioFeedbacks = {
 			level: number
 		}
 	}
-	['fairlightAudioMasterLevel']: {
+	['fairlightAudioMasterLevelThreshold']: {
 		type: 'boolean'
 		options: {
 			channel: 'left' | 'right' | 'max'
@@ -137,8 +137,8 @@ export function createFairlightAudioFeedbacks(
 ): CompanionFeedbackDefinitions<AtemFairlightAudioFeedbacks> {
 	if (!model.fairlightAudio) {
 		return {
-			['fairlightAudioSourceLevel']: undefined,
-			['fairlightAudioMasterLevel']: undefined,
+			['fairlightAudioSourceLevelThreshold']: undefined,
+			['fairlightAudioMasterLevelThreshold']: undefined,
 			['fairlightAudioInputGain']: undefined,
 			['fairlightAudioFaderGain']: undefined,
 			['fairlightAudioMixOption']: undefined,
@@ -185,7 +185,7 @@ export function createFairlightAudioFeedbacks(
 	}
 
 	return {
-		['fairlightAudioSourceLevel']: audioInputOption
+		['fairlightAudioSourceLevelThreshold']: audioInputOption
 			? {
 					type: 'boolean',
 					name: 'Fairlight Audio: Source output level',
@@ -216,7 +216,7 @@ export function createFairlightAudioFeedbacks(
 					},
 				}
 			: undefined,
-		['fairlightAudioMasterLevel']: {
+		['fairlightAudioMasterLevelThreshold']: {
 			type: 'boolean',
 			name: 'Fairlight Audio: Master output level',
 			description: 'Compares the current real-time master output level against a threshold',
