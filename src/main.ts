@@ -14,6 +14,7 @@ import {
 	updateChangedVariables,
 	updateDeviceIpVariable,
 	updateFairlightAudioLevelVariables,
+	getFairlightSourcesKey,
 } from './variables/lib.js'
 import { AtemCommandBatching } from './batching.js'
 import { AtemTransitions } from './transitions.js'
@@ -52,6 +53,8 @@ export default class AtemInstance extends InstanceBase<AtemSchema> {
 	private isActive: boolean
 	private durationInterval: NodeJS.Timeout | undefined
 	private atemTransitions: AtemTransitions
+	/** The Fairlight sources the variable definitions were last built for */
+	private fairlightSourcesKey = ''
 
 	public config: AtemConfig = {}
 	public timecodeSeconds = 0
@@ -231,6 +234,7 @@ export default class AtemInstance extends InstanceBase<AtemSchema> {
 	}
 
 	private updateCompanionBits(): void {
+		this.fairlightSourcesKey = getFairlightSourcesKey(this.wrappedState.state)
 		InitVariables(this, this.model, this.wrappedState)
 		this.setFeedbackDefinitions(GetFeedbacksList(this.config, this.model, this.wrappedState))
 		this.setActionDefinitions(
@@ -295,6 +299,7 @@ export default class AtemInstance extends InstanceBase<AtemSchema> {
 		this.wrappedState.mediaPoolCache.checkUpdatedState(newState)
 
 		let reInit = false
+		let fairlightSourcesChanged: boolean | undefined
 		const changedFeedbacks = new Set<keyof FeedbackTypes>()
 		const changedVariables: UpdateVariablesProps = {
 			meProgram: new Set(),
@@ -339,6 +344,13 @@ export default class AtemInstance extends InstanceBase<AtemSchema> {
 
 			const fairlightInputMatch = path.match(/fairlight.inputs.(\d+)/)
 			if (fairlightInputMatch) {
+				// An input was split or joined, so its variables need redefining
+				fairlightSourcesChanged ??= getFairlightSourcesKey(newState) !== this.fairlightSourcesKey
+				if (fairlightSourcesChanged) {
+					reInit = true
+					break
+				}
+
 				changedVariables.fairlightAudio.add(parseInt(fairlightInputMatch[1], 10))
 				changedFeedbacks.add('fairlightAudioInputGain')
 				changedFeedbacks.add('fairlightAudioFaderGain')

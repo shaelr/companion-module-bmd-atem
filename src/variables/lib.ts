@@ -548,6 +548,19 @@ export function updateDeviceIpVariable(instance: InstanceBaseExt, values: Partia
 	values['device_ip'] = instance.parseIpAndPort()?.ip || ''
 }
 
+/**
+ * Describe which sources each Fairlight input has. Splitting an input into mono channels (or joining
+ * it back) swaps its sources, and with them which audio variables are defined.
+ */
+export function getFairlightSourcesKey(state: AtemState): string {
+	return Object.entries(state.fairlight?.inputs ?? {})
+		.map(([inputId, input]) => {
+			const sourceIds = Object.keys(input?.sources ?? {}).sort()
+			return `${inputId}:${sourceIds.join(',')}`
+		})
+		.join(';')
+}
+
 export function InitVariables(instance: InstanceBaseExt, model: ModelSpec, state: StateWrapper): void {
 	const values: Partial<VariablesSchema> = {}
 	const variables: CompanionVariableDefinitions<VariablesSchema> = {
