@@ -13,6 +13,7 @@ import {
 	type UpdateVariablesProps,
 	updateChangedVariables,
 	updateDeviceIpVariable,
+	updateFairlightAudioLevelVariables,
 } from './variables/lib.js'
 import { AtemCommandBatching } from './batching.js'
 import { AtemTransitions } from './transitions.js'
@@ -34,6 +35,9 @@ import { ThreadedClassManager, RegisterExitHandlers } from 'threadedclass'
 
 // HACK: This stops it from registering an unhandledException handler, as that causes companion to exit on error
 ThreadedClassManager.handleExit = RegisterExitHandlers.NO
+
+/** Audio levels subscription held by the level variables, alongside those of feedbacks */
+const LEVEL_VARIABLES_SUBSCRIPTION = 'level-variables'
 
 export { UpgradeScripts }
 
@@ -68,7 +72,10 @@ export default class AtemInstance extends InstanceBase<AtemSchema> {
 			atemCameraState: new AtemCameraControlStateBuilder(0), // TODO - when should this be emptied?
 
 			audioLevels: new AtemAudioLevels(
-				() => this.checkFeedbacks('fairlightAudioMasterLevel', 'fairlightAudioInputLevel'),
+				() => {
+					this.checkFeedbacks('fairlightAudioMasterLevel', 'fairlightAudioInputLevel')
+					this.updateAudioLevelVariables()
+				},
 				(enabled) => {
 					if (!this.atem) return
 
@@ -613,6 +620,21 @@ export default class AtemInstance extends InstanceBase<AtemSchema> {
 		return changedFeedbackIds
 	}
 
+	/** Push the cached audio levels to the level variables, skipping any which are unchanged */
+	private updateAudioLevelVariables(): void {
+		const values: Partial<VariablesSchema> = {}
+		updateFairlightAudioLevelVariables(this.wrappedState, values)
+
+		const changed: Partial<VariablesSchema> = {}
+		for (const [id, value] of Object.entries(values)) {
+			if (this.getVariableValue(id) !== value) changed[id as keyof VariablesSchema] = value as any
+		}
+
+		if (Object.keys(changed).length > 0) {
+			this.setVariableValues(changed)
+		}
+	}
+
 	private setupAtemConnection(): void {
 		this.atem = new Atem()
 
@@ -623,6 +645,12 @@ export default class AtemInstance extends InstanceBase<AtemSchema> {
 				this.invalidateCachedTallyState()
 				// The switcher does not remember that we asked for levels
 				this.wrappedState.audioLevels.resume()
+				// The level variables need levels whenever the switcher can report them
+				if (this.atem.state.fairlight) {
+					this.wrappedState.audioLevels.subscribe(LEVEL_VARIABLES_SUBSCRIPTION)
+				} else {
+					this.wrappedState.audioLevels.unsubscribe(LEVEL_VARIABLES_SUBSCRIPTION)
+				}
 
 				const atemInfo = this.wrappedState.state.info
 				this.log('info', 'Connected to a ' + atemInfo.productIdentifier)
@@ -707,6 +735,7 @@ export default class AtemInstance extends InstanceBase<AtemSchema> {
 			}
 			this.log('info', 'Lost connection')
 			this.wrappedState.audioLevels.clearCache()
+			this.updateAudioLevelVariables()
 
 			if (this.durationInterval) {
 				clearInterval(this.durationInterval)

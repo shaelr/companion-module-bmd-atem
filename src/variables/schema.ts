@@ -144,7 +144,16 @@ export type VariablesSchema = {
 	[key: `audio_input_${string}_right_gain`]: string | undefined
 	[key: `audio_input_${string}_right_mixOption`]: string | undefined
 
+	[key: `audio_input_${string}_level_left`]: string | undefined
+	[key: `audio_input_${string}_level_right`]: string | undefined
+	[key: `audio_input_${string}_level_max`]: string | undefined
+	[key: `audio_input_${string}_left_level`]: string | undefined
+	[key: `audio_input_${string}_right_level`]: string | undefined
+
 	audio_master_faderGain?: string
+	audio_master_level_left?: string
+	audio_master_level_right?: string
+	audio_master_level_max?: string
 
 	audio_monitor_gain?: string
 	audio_monitor_master_gain?: string
