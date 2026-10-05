@@ -68,7 +68,7 @@ Level variables (strings in dBFS, from each source's _output_ levels):
 | `audio_input_X_right_level`                    | Split-mono right `-255` (max of its L/R) |
 | `audio_master_level_left` / `_right` / `_max`  | Master                                   |
 
-The stereo and master names match an earlier fork of this module, so existing button text using them keeps working. That earlier fork also had threshold feedbacks (`fairlightAudioSourceLevel` / `fairlightAudioSourceLevelThreshold` etc.) — those are **not** carried over; use Companion's internal variable-check feedback against the level variables instead.
+There are no threshold feedbacks for levels — to colour a button by level, use Companion's internal variable-check feedback against the level variables.
 
 Level values from the ATEM are signed 16-bit integers in hundredths of a dB; `AtemAudioLevels` divides by 100 to get dBFS.
 
@@ -83,7 +83,7 @@ git merge v4.x.y        # the new release tag
 
 Upstream may eventually add its own level variables — if so, check for colliding variable keys and prefer upstream's implementation where it covers the same thing. After merging, run `yarn build`, `yarn test`, and `yarn lint` — a clean merge can still produce colliding identifiers (feedback IDs, variable keys) that only a build/test pass will catch. Then bump the version (see below) and `yarn dist`.
 
-This build is published to `shaelr/companion-module-bmd-atem` (remote `fork`); the local `audio-level-variables` branch tracks `fork/main`, so `git push fork audio-level-variables:main` publishes it. The fork's history from before this rebuild (the earlier threshold-feedback version) is kept on the `backup/old-main-2026-10-05` branch there. Pushing requires the `gh` CLI token to have GitHub's `workflow` scope if the history touches `.github/workflows/` — otherwise the push is rejected with "refusing to allow an OAuth App to create or update workflow". Fix with `gh auth refresh -h github.com -s workflow` (opens a browser).
+This build is published to `shaelr/companion-module-bmd-atem` (remote `fork`); the local `audio-level-variables` branch tracks `fork/main`, so `git push fork audio-level-variables:main` publishes it. Pushing requires the `gh` CLI token to have GitHub's `workflow` scope if the history touches `.github/workflows/` — otherwise the push is rejected with "refusing to allow an OAuth App to create or update workflow". Fix with `gh auth refresh -h github.com -s workflow` (opens a browser).
 
 ### Adding a new feature area
 
