@@ -98,7 +98,7 @@ Renaming or removing a feedback/action ID breaks saved buttons that use it — a
 
 Companion requires strict semver. Use `major.minor.patch` or `major.minor.patch-prerelease` (e.g. `4.1.3`). Suffixes like `4.0.2a` are invalid and will be rejected by Companion's module loader.
 
-Custom builds of this repo use `<upstream version>-levels.<n>` (currently `4.3.1-levels.2`), so they're distinguishable from the official release in Companion. Bump `n` for each new build on the same upstream version.
+Custom builds of this repo use a `-levels.<n>` prerelease suffix (currently `4.3.2-levels.2`, built on upstream `v4.3.1`), so they're distinguishable from the official release in Companion. Bump `n` for each new build. Note that semver sorts a prerelease _before_ its release: `4.3.1-levels.N` < `4.3.1`, but `4.3.2-levels.N` > `4.3.1`.
 
 ## Installing on Companion
 
